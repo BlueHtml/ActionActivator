@@ -18,30 +18,35 @@ namespace ActionActivator
             {
                 _scClient = new HttpClient();
             }
-            string owner = GetEnvValue("GITHUB_ACTOR");
 
-            using var client = new HttpClient();
-            client.DefaultRequestHeaders.Add("User-Agent", owner);
-            client.DefaultRequestHeaders.Add("Authorization", $"token {_conf.Token}");
             Console.WriteLine("ActionActivator开始运行...");
-
-            foreach (Repo repo in _conf.Repos)
+            foreach (Activator act in _conf.Acts)
             {
-                string badInfo = null;
-                try
-                {
+                string owner = act.User;
+                Console.WriteLine($"共 {_conf.Acts.Length} 个账号，正在运行{owner}...");
 
-                    var httpResponseMessage = await client.PutAsync($"https://api.github.com/repos/{owner}/{repo.Name}/actions/workflows/{repo.WorkflowFileName}/enable", null);
-                    if (httpResponseMessage.StatusCode != HttpStatusCode.NoContent)
-                    {//请求失败
-                        badInfo = $"请求失败. code: {httpResponseMessage.StatusCode}, msg: {await httpResponseMessage.Content.ReadAsStringAsync()}";
-                    }
-                }
-                catch (Exception ex)
+                using var client = new HttpClient();
+                client.DefaultRequestHeaders.Add("User-Agent", owner);
+                client.DefaultRequestHeaders.Add("Authorization", $"token {act.Token}");
+
+                foreach (Repo repo in act.Repos)
                 {
-                    badInfo = $"ex: {ex.Message}";
+                    string badInfo = null;
+                    try
+                    {
+
+                        var httpResponseMessage = await client.PutAsync($"https://api.github.com/repos/{owner}/{repo.Name}/actions/workflows/{repo.WorkflowFileName}/enable", null);
+                        if (httpResponseMessage.StatusCode != HttpStatusCode.NoContent)
+                        {//请求失败
+                            badInfo = $"请求失败. code: {httpResponseMessage.StatusCode}, msg: {await httpResponseMessage.Content.ReadAsStringAsync()}";
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        badInfo = $"ex: {ex.Message}";
+                    }
+                    await Notify($"{repo.Name}...{badInfo ?? "ok"}", badInfo != null);
                 }
-                await Notify($"{repo.Name}...{badInfo ?? "ok"}", badInfo != null);
             }
             Console.WriteLine("ActionActivator运行完毕");
         }
@@ -70,6 +75,12 @@ namespace ActionActivator
         {
             public string ScKey { get; set; }
             public string ScType { get; set; }
+            public Activator[] Acts { get; set; }
+        }
+
+        class Activator
+        {
+            public string User { get; set; }
             public string Token { get; set; }
             public Repo[] Repos { get; set; }
         }
